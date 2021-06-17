@@ -231,10 +231,10 @@ def new_operator_fragment(suffix_string, fragments, status):
         return Fragment(start=status[-2], end=status[-1])
     elif suffix_string == '*':
         fragment = fragments[-1]
-        status.append(NfaNode([fragment.end.id], status_index, None, chr(949)))  # end
+        status.append(NfaNode([fragment.end.id], status_index, None, chr(949)))  # s_2 = end
         fragment.end.toid.append(status_index)  # back 2 end
         status_index += 1
-        status.append(NfaNode(None, status_index, [fragment.start.id, status[-1].id], chr(949)))  # start
+        status.append(NfaNode(None, status_index, [fragment.start.id, status[-1].id], chr(949)))  # s_1 = start
         status[-2].fromid.append(status[-1].id)  # start 2 end
         fragment.end.toid.append(fragment.start.id)  # back to front
         fragment.start.fromid.append(fragment.end.id)
@@ -254,6 +254,7 @@ def to_nfa(suffix_string):
         elif token.is_operator(suffix_string[index]):
             nfa_fragments.append(new_operator_fragment(suffix_string[index], nfa_fragments, nfa_status))
     nfa_status.append(NfaNode(None, status_index, nfa_fragments[-1].start.id, chr(949)))
+    nfa_fragments[-1].start.fromid.append(status_index)  # 原start的fromid加上新start的id
     nfa_fragments[-1].start = nfa_status[status_index]
     status_index += 1
     return nfa_fragments, nfa_status
@@ -414,7 +415,7 @@ def nfa_show(fragments, status):
     for sta in status:
         for to_id in sta.toid:
             f.edge("{}".format(str(sta.id)), "{}".format(str(to_id)), label="{}".format(str(sta.key)))
-    f.view()
+    # f.view()
 
 
 def main():
@@ -430,7 +431,7 @@ def main():
     suffix_string = suffixexp(modify_string)
     # print(suffix_string)
     fragments, nfa_nodes = to_nfa(suffix_string)
-    nfa_show(fragments, nfa_nodes)
+    nfa_show(fragments, nfa_nodes)  # test 1
 
     dfa_nodes = nfa2dfa(nfa_nodes)
     # print(dfa_nodes)
