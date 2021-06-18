@@ -332,6 +332,54 @@ def nfa_show(fragments, status):
     f.view()
 
 
+def minidfa(dfa_nodes):
+    end_index = [index for index in range(len(dfa_nodes)) if dfa_nodes[index].end_status]
+    scores = []
+    for index in range(len(dfa_nodes)):
+        score = 0
+        if index in end_index:
+            score += 256
+        if isinstance(dfa_nodes[index].a, int):
+            if dfa_nodes[index].a in end_index:
+                score += 16
+            else:
+                score += 1
+        if isinstance(dfa_nodes[index].b, int):
+            if dfa_nodes[index].b in end_index:
+                score += 32
+            else:
+                score += 2
+        if isinstance(dfa_nodes[index].c, int):
+            if dfa_nodes[index].c in end_index:
+                score += 64
+            else:
+                score += 4
+        if isinstance(dfa_nodes[index].d, int):
+            if dfa_nodes[index].d in end_index:
+                score += 128
+            else:
+                score += 8
+        scores.append(score)
+    groups = []
+    for index in range(len(scores)):
+        if not scores[index]:
+            continue
+        group = [index]
+        for jndex in range(index, len(scores)):
+            if not scores[jndex]:
+                continue
+            elif index != jndex and scores[index] == scores[jndex]:
+                group.append(jndex)
+                scores[jndex] = 0
+        groups.append(group)
+    for group in groups:
+        if len(group) == 1:
+            continue
+        index = group[0]
+        for i in range(2,len(group)):
+
+
+
 def main():
     global token
     global status_index
@@ -355,6 +403,7 @@ def main():
     # print(dfa_nodes)
     dfa_show(dfa_nodes)
 
+    dfa_nodes = minidfa(dfa_nodes)
 
 if __name__ == '__main__':
     main()
