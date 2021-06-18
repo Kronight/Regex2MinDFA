@@ -3,8 +3,8 @@ from graphviz import Digraph
 
 
 class NfaNode(object):
-    def __init__(self, fromid=None, id=None, toid=None, key=chr(949)):
-        self.id = id
+    def __init__(self, fromid=None, _id=None, toid=None, key=chr(949)):
+        self.id = _id
         self.key = key
         self.fromid = []
         self.toid = []
@@ -29,49 +29,13 @@ class NfaNode(object):
 
 
 class DfaNode(object):
-    def __init__(self, a_status=None, b_status=None, c_status=None, d_status=None, null_status=None):
-        # self.end_status = False
-        self.status = {
-            'a': [],
-            'b': [],
-            'c': [],
-            'd': []
-        }
-        if null_status is not None:
-            self.status['a'] = null_status
-            self.status['b'] = null_status
-            self.status['c'] = null_status
-            self.status['d'] = null_status
-
-        else:
-            if a_status is not None:
-                self.status['a'] = a_status
-            if b_status is not None:
-                self.status['b'] = b_status
-            if c_status is not None:
-                self.status['c'] = c_status
-            if d_status is not None:
-                self.status['d'] = d_status
-
-
-    def __repr__(self):
-        return 'a = {}  b = {}'.format(self.status["a"], self.status["b"],
-                                       self.status['c'], self.status['d'])
-
-    def sort(self):
-        self.status['a'].sort()
-        self.status['b'].sort()
-        self.status['c'].sort()
-        self.status['d'].sort()
-
-
-class MDfaNode(object):
-    def __init__(self, id_, a, b, c, d):
-        self.id = id_
-        self.a = a
-        self.b = b
-        self.c = c
-        self.d = d
+    def __init__(self, status=None, a_status=None, b_status=None, c_status=None, d_status=None, is_end=False):
+        self.end_status = is_end
+        self.s = set(status)
+        self.a = set(a_status) if a_status else set()
+        self.b = set(b_status) if b_status else set()
+        self.c = set(c_status) if c_status else set()
+        self.d = set(d_status) if d_status else set()
 
 
 class Fragment(object):
@@ -85,7 +49,7 @@ class Fragment(object):
 
 class Token(object):
     def __init__(self):
-        self.alphas = ['a', 'b','c','d']
+        self.alphas = ['a', 'b', 'c', 'd']
         self.operators = ['(', '*', '.', '|', ')']
         self.epsilon = chr(949)  # ε
 
@@ -271,142 +235,92 @@ def find_null(status, nfa_nodes):
     return status
 
 
-def nfa2dfa(nfa_nodes):
-    dfa_nodes = []
-    for index in range(len(nfa_nodes)):
-        if nfa_nodes[index].toid:
-            if nfa_nodes[index].key == chr(949):
-                null_status = nfa_nodes[index].toid
-                find_null(null_status, nfa_nodes)
-                dfa_nodes.append(DfaNode(null_status=null_status))
-            else:
-                a_status = []
-                b_status = []
-                c_status = []
-                d_status = []
-                if nfa_nodes[index].key == 'a':
-                    a_status = nfa_nodes[index].toid
-                    a_status = find_null(a_status, nfa_nodes)
-                elif nfa_nodes[index].key == 'b':
-                    b_status = nfa_nodes[index].toid
-                    b_status = find_null(b_status, nfa_nodes)
-                elif nfa_nodes[index].key == 'c':
-                    c_status = nfa_nodes[index].toid
-                    c_status = find_null(c_status, nfa_nodes)
-                elif nfa_nodes[index].key == 'd':
-                    d_status = nfa_nodes[index].toid
-                    d_status = find_null(d_status, nfa_nodes)
-                dfa_nodes.append(DfaNode(a_status=a_status, b_status=b_status, c_status=c_status, d_status=d_status))
-        else:
-            a_status = None
-            b_status = None
-            c_status = None
-            d_status = None
-            dfa_nodes.append(DfaNode(a_status=a_status, b_status=b_status, c_status=c_status, d_status=d_status))
+def closure(nfa_nodes, index, alpha, closure_list):
+    if nfa_nodes[index].key != alpha:
+        return
+    else:
+        for _id in nfa_nodes[index].toid:
+            closure(nfa_nodes, _id, chr(949), closure_list)
+            if _id not in closure_list:
+                closure_list.append(_id)
+    closure_list.sort()
+
+
+def nfa2dfa(nfa_nodes, start_id, end_id):
+    dfa_nodes, id_lists, initial_list = [], [], []
+    closure(nfa_nodes, start_id, chr(949), initial_list)
+    id_lists.append(initial_list)
+    for id_list in id_lists:
+        a_list, b_list, c_list, d_list = [], [], [], []
+        for id_ in id_list:
+            closure(nfa_nodes, id_, 'a', a_list)
+            a_list = delete_same(id_list, a_list)
+            closure(nfa_nodes, id_, 'b', b_list)
+            b_list = delete_same(id_list, b_list)
+            closure(nfa_nodes, id_, 'c', c_list)
+            c_list = delete_same(id_list, c_list)
+            closure(nfa_nodes, id_, 'd', d_list)
+            d_list = delete_same(id_list, d_list)
+        dfa_nodes.append(DfaNode(id_list, a_list, b_list, c_list, d_list, is_end(end_id, id_list)))
+        list_in(a_list, id_lists)
+        list_in(b_list, id_lists)
+        list_in(c_list, id_lists)
+        list_in(d_list, id_lists)
+    for index in range(len(dfa_nodes)):
+        for jndex in range(len(dfa_nodes)):
+            if dfa_nodes[index].a == dfa_nodes[jndex].s:
+                dfa_nodes[index].a = jndex
+            if dfa_nodes[index].b == dfa_nodes[jndex].s:
+                dfa_nodes[index].b = jndex
+            if dfa_nodes[index].c == dfa_nodes[jndex].s:
+                dfa_nodes[index].c = jndex
+            if dfa_nodes[index].d == dfa_nodes[jndex].s:
+                dfa_nodes[index].d = jndex
+    print("\nNo.  a   b   c    d")
+    for index in range(len(dfa_nodes)):
+        print(str(index) + " " + str(dfa_nodes[index].a) + " " + str(dfa_nodes[index].b) + " " + str(dfa_nodes[index].c) + " " + str(dfa_nodes[index].d))
     return dfa_nodes
 
 
-def dfa_verify(dfa_nodes, start_index, nfa_nodes):
-    new_dfa_nodes = []
-    list_ = [start_index]
-    temp_list = [list_]
-    status_set = set()
-    status_set.add(tuple(sorted(list_)))
-    while temp_list:
-        a_temp_list = []
-        b_temp_list = []
-        c_temp_list = []
-        d_temp_list = []
-        for index in temp_list[0]:
-            if nfa_nodes[index].key == chr(949):
-                for add_id in add_dfa_node(dfa_nodes[index].status['a'], a_temp_list):
-                    a_temp_list.append(add_id)
-                for add_id in add_dfa_node(dfa_nodes[index].status['b'], b_temp_list):
-                    b_temp_list.append(add_id)
-                for add_id in add_dfa_node(dfa_nodes[index].status['c'], c_temp_list):
-                    c_temp_list.append(add_id)
-                for add_id in add_dfa_node(dfa_nodes[index].status['d'], d_temp_list):
-                    d_temp_list.append(add_id)
-
-            elif nfa_nodes[index].key == 'a':
-                for add_id in add_dfa_node(dfa_nodes[index].status['a'], a_temp_list):
-                    a_temp_list.append(add_id)
-            elif nfa_nodes[index].key == 'b':
-                for add_id in add_dfa_node(dfa_nodes[index].status['b'], b_temp_list):
-                    b_temp_list.append(add_id)
-            elif nfa_nodes[index].key == 'c':
-                for add_id in add_dfa_node(dfa_nodes[index].status['c'], c_temp_list):
-                    c_temp_list.append(add_id)
-            elif nfa_nodes[index].key == 'd':
-                for add_id in add_dfa_node(dfa_nodes[index].status['d'], d_temp_list):
-                    d_temp_list.append(add_id)
-
-        a_tuple = tuple(sorted(a_temp_list))
-        b_tuple = tuple(sorted(b_temp_list))
-        c_tuple = tuple(sorted(c_temp_list))
-        d_tuple = tuple(sorted(d_temp_list))
-
-        if a_tuple in status_set and b_tuple in status_set and c_tuple in status_set and d_tuple in status_set:
-            break
-        else:
-            status_set.add(a_tuple)
-            status_set.add(b_tuple)
-            status_set.add(c_tuple)
-            status_set.add(d_tuple)
-        if a_tuple == b_tuple and b_tuple == c_tuple and c_tuple == d_tuple:
-            temp_list.append(a_temp_list)
-        else:
-            if a_temp_list:
-                temp_list.append(a_temp_list)
-            if b_temp_list:
-                temp_list.append(b_temp_list)
-            if c_temp_list:
-                temp_list.append(c_temp_list)
-            if d_temp_list:
-                temp_list.append(d_temp_list)
-        new_dfa_nodes.append(MDfaNode(tuple(sorted(temp_list[0])), a_tuple, b_tuple, c_tuple, d_tuple))
-        del (temp_list[0])
-    return new_dfa_nodes, status_set
+def delete_same(_list, to_list):
+    if _list == to_list:
+        to_list = []
+    return to_list
 
 
-def add_dfa_node(dfa_node, temp_list):
-    result_list = []
-    for num in dfa_node:
-        if num not in temp_list:
-            result_list.append(num)
-    return result_list
+def is_end(id_, list_):
+    if id_ in list_:
+        return True
+    return False
 
 
-def dfa_show(end_id, new_dfa_nodes):
-    f = Digraph(name="NFA", filename="DFA.gv", format='png')
+def list_in(_list, id_lists):
+    if _list and _list not in id_lists:
+        id_lists.append(_list)
+
+
+def dfa_show(dfa_nodes):
+    f = Digraph(name="DFA", filename="DFA", format='png')
     f.attr(rankdir='LR', size='8,5')
     f.attr('node', shape='doublecircle')
-    for index in range(len(new_dfa_nodes)):
-        if end_id in list(new_dfa_nodes[index].id):
-            f.node("{}".format(str(new_dfa_nodes[index].id)))
-        if end_id in list(new_dfa_nodes[index].a):
-            f.node("{}".format(str(new_dfa_nodes[index].a)))
-        if end_id in list(new_dfa_nodes[index].b):
-            f.node("{}".format(str(new_dfa_nodes[index].b)))
-        if end_id in list(new_dfa_nodes[index].c):
-            f.node("{}".format(str(new_dfa_nodes[index].c)))
-        if end_id in list(new_dfa_nodes[index].d):
-            f.node("{}".format(str(new_dfa_nodes[index].d)))
+    for index in range(len(dfa_nodes)):
+        if dfa_nodes[index].end_status:
+            f.node('{}'.format(str(index)))
     f.attr('node', shape='circle')
-    for index in range(len(new_dfa_nodes)):
-        if new_dfa_nodes[index].a:
-            f.edge("{}".format(str(new_dfa_nodes[index].id)), "{}".format(str(new_dfa_nodes[index].a)), label="a")
-        if new_dfa_nodes[index].b:
-            f.edge("{}".format(str(new_dfa_nodes[index].id)), "{}".format(str(new_dfa_nodes[index].b)), label="b")
-        if new_dfa_nodes[index].c:
-            f.edge("{}".format(str(new_dfa_nodes[index].id)), "{}".format(str(new_dfa_nodes[index].c)), label="c")
-        if new_dfa_nodes[index].d:
-            f.edge("{}".format(str(new_dfa_nodes[index].id)), "{}".format(str(new_dfa_nodes[index].d)), label="d")
+    for index in range(len(dfa_nodes)):
+        if isinstance(dfa_nodes[index].a, int):
+            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].a)), label="a")
+        if isinstance(dfa_nodes[index].b, int):
+            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].b)), label="b")
+        if isinstance(dfa_nodes[index].c, int):
+            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].c)), label="c")
+        if isinstance(dfa_nodes[index].d, int):
+            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].d)), label="d")
     f.view()
 
 
 def nfa_show(fragments, status):
-    f = Digraph(name="NFA", filename="NFA.gv", format='png')
+    f = Digraph(name="NFA", filename="NFA", format='png')
     f.attr(rankdir='LR', size='8,5')
     f.attr('node', shape='doublecircle')
     end_id = fragments[0].end.id
@@ -415,15 +329,16 @@ def nfa_show(fragments, status):
     for sta in status:
         for to_id in sta.toid:
             f.edge("{}".format(str(sta.id)), "{}".format(str(to_id)), label="{}".format(str(sta.key)))
-    # f.view()
+    f.view()
 
 
 def main():
     global token
     global status_index
-    # input_string = input('>>')
+    input_string = input('>>')
     # input_string = 'b*a(a|b)*'
-    input_string = 'a(a|b)cd'
+    # input_string = '(ab)*(a*|b*)(ba)*'
+    # input_string = 'a(a|b)cd'
 
     modify_string = "".join(modify_regex(input_string))
     # print(modify_string)
@@ -433,14 +348,11 @@ def main():
     fragments, nfa_nodes = to_nfa(suffix_string)
     nfa_show(fragments, nfa_nodes)  # test 1
 
-    dfa_nodes = nfa2dfa(nfa_nodes)
+    start_id = fragments[-1].start.id
+    end_id = fragments[-1].end.id
+    dfa_nodes = nfa2dfa(nfa_nodes, start_id, end_id)
     # print(dfa_nodes)
-    start_index = fragments[-1].start.id
-    end_index = fragments[-1].end.id
-
-    new_dfa_nodes, status_set = dfa_verify(dfa_nodes, start_index, nfa_nodes)
-    # print(new_dfa_nodes)
-    dfa_show(end_index, new_dfa_nodes)
+    dfa_show(dfa_nodes)
 
 
 if __name__ == '__main__':
