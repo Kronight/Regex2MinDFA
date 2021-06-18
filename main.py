@@ -254,13 +254,13 @@ def nfa2dfa(nfa_nodes, start_id, end_id):
         a_list, b_list, c_list, d_list = [], [], [], []
         for id_ in id_list:
             closure(nfa_nodes, id_, 'a', a_list)
-            a_list = delete_same(id_list, a_list)
+            # a_list = delete_same(id_list, a_list)
             closure(nfa_nodes, id_, 'b', b_list)
-            b_list = delete_same(id_list, b_list)
+            # b_list = delete_same(id_list, b_list)
             closure(nfa_nodes, id_, 'c', c_list)
-            c_list = delete_same(id_list, c_list)
+            # c_list = delete_same(id_list, c_list)
             closure(nfa_nodes, id_, 'd', d_list)
-            d_list = delete_same(id_list, d_list)
+            # d_list = delete_same(id_list, d_list)
         dfa_nodes.append(DfaNode(id_list, a_list, b_list, c_list, d_list, is_end(end_id, id_list)))
         list_in(a_list, id_lists)
         list_in(b_list, id_lists)
@@ -335,7 +335,8 @@ def nfa_show(fragments, status):
 def main():
     global token
     global status_index
-    input_string = input('>>')
+    # input_string = input('>>')
+    input_string = 'b(a|b)*a'
     # input_string = 'b*a(a|b)*'
     # input_string = '(ab)*(a*|b*)(ba)*'
     # input_string = 'a(a|b)cd'
