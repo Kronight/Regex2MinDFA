@@ -225,17 +225,6 @@ def to_nfa(suffix_string):
     return nfa_fragments, nfa_status
 
 
-def find_null(status, nfa_nodes):
-    for index in status:
-        if len(nfa_nodes[index].toid) != 0:
-            if nfa_nodes[index].key == chr(949):
-                for id_add in nfa_nodes[index].toid:
-                    find_null([id_add], nfa_nodes)
-                    if id_add not in status:
-                        status.append(id_add)
-    return status
-
-
 def closure(nfa_nodes, index, alpha, closure_list):
     if nfa_nodes[index].key != alpha:
         return
@@ -313,7 +302,7 @@ def mini_dfa_show(dfa_nodes):
     f.attr('node', shape='doublecircle')
     for index in range(len(dfa_nodes)):
         if dfa_nodes[index].end_status:
-            f.node('{}'.format(str(index)))
+            f.node('{}'.format(str(dfa_nodes[index].number)))
     f.attr('node', shape='circle')
     for index in range(len(dfa_nodes)):
         if isinstance(dfa_nodes[index].a, int):
@@ -325,6 +314,7 @@ def mini_dfa_show(dfa_nodes):
         if isinstance(dfa_nodes[index].d, int):
             f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].d)), label="d")
     f.view()
+
 
 def dfa_show(dfa_nodes):
     f = Digraph(name="DFA", filename="DFA", format='png')
@@ -343,7 +333,7 @@ def dfa_show(dfa_nodes):
             f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].c)), label="c")
         if isinstance(dfa_nodes[index].d, int):
             f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].d)), label="d")
-    f.view()
+    # f.view()
 
 
 def nfa_show(fragments, status):
@@ -359,6 +349,50 @@ def nfa_show(fragments, status):
     f.view()
 
 
+def regroup(groups, dfa_nodes, end_index):
+    _len1 = len(groups)
+    # 大组中的每个组
+    for group in groups:
+        group_scores = []
+        if len(group) == 1:
+            continue
+        # 每个组里的Index
+        for index in range(len(group)):
+            score = 0
+            # 计算每个组内index的分数
+            if dfa_nodes[group[index]].end_status:
+                score += 256
+            for jndex in range(len(groups)):
+                if isinstance(dfa_nodes[group[index]].a, int) and dfa_nodes[group[index]].a in groups[jndex]:
+                    score += (2**(jndex+9) + score_count(dfa_nodes[group[index]].a, end_index, score, 1))
+                if isinstance(dfa_nodes[group[index]].b, int) and dfa_nodes[group[index]].b in groups[jndex]:
+                    score += (2**(jndex+9) + score_count(dfa_nodes[group[index]].b, end_index, score, 2))
+                # 此处无故跳转 [0,7]
+                if isinstance(dfa_nodes[group[index]].c, int) and dfa_nodes[group[index]].c in groups[jndex]:
+                    score += (2**(jndex+9) + score_count(dfa_nodes[group[index]].c, end_index, score, 4))
+                if isinstance(dfa_nodes[group[index]].d, int) and dfa_nodes[group[index]].d in groups[jndex]:
+                    score += (2**(jndex+9) + score_count(dfa_nodes[group[index]].d, end_index, score, 8))
+            # 每个小组的分数
+            group_scores.append(score)
+            # 根据组分数重新分组
+        for kndex in range(len(group)):
+            new_group = [group[kndex]]
+            if not group_scores[kndex]:
+                continue
+            for jndex in range(kndex, len(group)):
+                if not group_scores[jndex]:
+                    continue
+                elif kndex != jndex and group_scores[kndex] == group_scores[jndex]:
+                    new_group.append(group[jndex])
+                    group_scores[jndex] = 0
+            groups.append(new_group)
+        groups.remove(group)
+    _len2 = len(groups)
+    # if _len1 != _len2:
+    #     groups = regroup(groups, dfa_nodes, end_index)
+    return groups
+
+
 def minidfa(dfa_nodes):
     end_index = [dfa_nodes[index].number for index in range(len(dfa_nodes)) if dfa_nodes[index].end_status]
     scores = []
@@ -366,26 +400,10 @@ def minidfa(dfa_nodes):
         score = 0
         if index in end_index:
             score += 256
-        if isinstance(dfa_nodes[index].a, int):
-            if dfa_nodes[index].a in end_index:
-                score += 16
-            else:
-                score += 1
-        if isinstance(dfa_nodes[index].b, int):
-            if dfa_nodes[index].b in end_index:
-                score += 32
-            else:
-                score += 2
-        if isinstance(dfa_nodes[index].c, int):
-            if dfa_nodes[index].c in end_index:
-                score += 64
-            else:
-                score += 4
-        if isinstance(dfa_nodes[index].d, int):
-            if dfa_nodes[index].d in end_index:
-                score += 128
-            else:
-                score += 8
+        score = score_count(dfa_nodes[index].a, end_index, score, 1)
+        score = score_count(dfa_nodes[index].b, end_index, score, 2)
+        score = score_count(dfa_nodes[index].c, end_index, score, 4)
+        score = score_count(dfa_nodes[index].d, end_index, score, 8)
         scores.append(score)
     groups = []
     for index in range(len(scores)):
@@ -399,15 +417,10 @@ def minidfa(dfa_nodes):
                 group.append(jndex)
                 scores[jndex] = 0
         groups.append(group)
-    count = 0
-    delete_i = []
+    groups = regroup(groups, dfa_nodes, end_index)
     print(groups)
+    delete_i = []
     for group in groups:
-        if count == len(groups):
-            return dfa_nodes
-        if len(group) == 1:
-            count += 1
-            continue
         main_index = group[0]
         for i in range(1, len(group)):
             delete_i.append(group[i])
@@ -424,8 +437,16 @@ def minidfa(dfa_nodes):
     for i in range(len(delete_i)):
         del dfa_nodes[delete_i[i]]
     test_node(dfa_nodes)
-    # dfa_nodes = minidfa(dfa_nodes)
     return dfa_nodes
+
+
+def score_count(to_state, end_index, score, i):
+    if isinstance(to_state, int):
+        if to_state in end_index:
+            score += 16 * i
+        else:
+            score += i
+    return score
 
 
 def main():
@@ -434,8 +455,8 @@ def main():
     # input_string = input('>>')
     # input_string = 'b(a|b)*a'
     # input_string = 'b*a(a|b)*'
-    input_string = '(ab)*(a*|b*)(ba)*'
-    # input_string = 'a(a|b)cd'
+    # input_string = '(ab)*(a*|b*)(ba)*'
+    input_string = 'a(a|b)cd'
 
     modify_string = "".join(modify_regex(input_string))
     # print(modify_string)
@@ -453,6 +474,7 @@ def main():
 
     dfa_nodes = minidfa(dfa_nodes)
     mini_dfa_show(dfa_nodes)
+
 
 if __name__ == '__main__':
     main()
