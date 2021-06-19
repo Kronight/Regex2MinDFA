@@ -29,7 +29,8 @@ class NfaNode(object):
 
 
 class DfaNode(object):
-    def __init__(self, status=None, a_status=None, b_status=None, c_status=None, d_status=None, is_end=False):
+    def __init__(self, number=None, status=None, a_status=None, b_status=None, c_status=None, d_status=None, is_end=False):
+        self.number = number
         self.end_status = is_end
         self.s = set(status)
         self.a = set(a_status) if a_status else set()
@@ -247,6 +248,7 @@ def closure(nfa_nodes, index, alpha, closure_list):
 
 
 def nfa2dfa(nfa_nodes, start_id, end_id):
+    index = 0
     dfa_nodes, id_lists, initial_list = [], [], []
     closure(nfa_nodes, start_id, chr(949), initial_list)
     id_lists.append(initial_list)
@@ -261,7 +263,8 @@ def nfa2dfa(nfa_nodes, start_id, end_id):
             # c_list = delete_same(id_list, c_list)
             closure(nfa_nodes, id_, 'd', d_list)
             # d_list = delete_same(id_list, d_list)
-        dfa_nodes.append(DfaNode(id_list, a_list, b_list, c_list, d_list, is_end(end_id, id_list)))
+        dfa_nodes.append(DfaNode(index, id_list, a_list, b_list, c_list, d_list, is_end(end_id, id_list)))
+        index += 1
         list_in(a_list, id_lists)
         list_in(b_list, id_lists)
         list_in(c_list, id_lists)
@@ -276,10 +279,15 @@ def nfa2dfa(nfa_nodes, start_id, end_id):
                 dfa_nodes[index].c = jndex
             if dfa_nodes[index].d == dfa_nodes[jndex].s:
                 dfa_nodes[index].d = jndex
-    print("\nNo.  a   b   c    d")
-    for index in range(len(dfa_nodes)):
-        print(str(index) + " " + str(dfa_nodes[index].a) + " " + str(dfa_nodes[index].b) + " " + str(dfa_nodes[index].c) + " " + str(dfa_nodes[index].d))
+    test_node(dfa_nodes)
     return dfa_nodes
+
+
+def test_node(dfa_nodes):
+    print("\nNo  a  b  c  d end")
+    for index in range(len(dfa_nodes)):
+        print(str(dfa_nodes[index].number) + " " + str(dfa_nodes[index].a) + " " + str(dfa_nodes[index].b) + " " + str(
+            dfa_nodes[index].c) + " " + str(dfa_nodes[index].d) + " " +str(dfa_nodes[index].end_status))
 
 
 def delete_same(_list, to_list):
@@ -299,6 +307,25 @@ def list_in(_list, id_lists):
         id_lists.append(_list)
 
 
+def mini_dfa_show(dfa_nodes):
+    f = Digraph(name="miniDFA", filename="miniDFA", format='png')
+    f.attr(rankdir='LR', size='8,5')
+    f.attr('node', shape='doublecircle')
+    for index in range(len(dfa_nodes)):
+        if dfa_nodes[index].end_status:
+            f.node('{}'.format(str(index)))
+    f.attr('node', shape='circle')
+    for index in range(len(dfa_nodes)):
+        if isinstance(dfa_nodes[index].a, int):
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].a)), label="a")
+        if isinstance(dfa_nodes[index].b, int):
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].b)), label="b")
+        if isinstance(dfa_nodes[index].c, int):
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].c)), label="c")
+        if isinstance(dfa_nodes[index].d, int):
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].d)), label="d")
+    f.view()
+
 def dfa_show(dfa_nodes):
     f = Digraph(name="DFA", filename="DFA", format='png')
     f.attr(rankdir='LR', size='8,5')
@@ -309,13 +336,13 @@ def dfa_show(dfa_nodes):
     f.attr('node', shape='circle')
     for index in range(len(dfa_nodes)):
         if isinstance(dfa_nodes[index].a, int):
-            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].a)), label="a")
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].a)), label="a")
         if isinstance(dfa_nodes[index].b, int):
-            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].b)), label="b")
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].b)), label="b")
         if isinstance(dfa_nodes[index].c, int):
-            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].c)), label="c")
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].c)), label="c")
         if isinstance(dfa_nodes[index].d, int):
-            f.edge("{}".format(str(index)), "{}".format(str(dfa_nodes[index].d)), label="d")
+            f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].d)), label="d")
     f.view()
 
 
@@ -333,7 +360,7 @@ def nfa_show(fragments, status):
 
 
 def minidfa(dfa_nodes):
-    end_index = [index for index in range(len(dfa_nodes)) if dfa_nodes[index].end_status]
+    end_index = [dfa_nodes[index].number for index in range(len(dfa_nodes)) if dfa_nodes[index].end_status]
     scores = []
     for index in range(len(dfa_nodes)):
         score = 0
@@ -372,21 +399,42 @@ def minidfa(dfa_nodes):
                 group.append(jndex)
                 scores[jndex] = 0
         groups.append(group)
+    count = 0
+    delete_i = []
+    print(groups)
     for group in groups:
+        if count == len(groups):
+            return dfa_nodes
         if len(group) == 1:
+            count += 1
             continue
-        index = group[0]
-        for i in range(2,len(group)):
-
+        main_index = group[0]
+        for i in range(1, len(group)):
+            delete_i.append(group[i])
+            for index in range(len(dfa_nodes)):
+                if dfa_nodes[index].a == group[i]:
+                    dfa_nodes[index].a = dfa_nodes[main_index].number
+                if dfa_nodes[index].b == group[i]:
+                    dfa_nodes[index].b = dfa_nodes[main_index].number
+                if dfa_nodes[index].c == group[i]:
+                    dfa_nodes[index].c = dfa_nodes[main_index].number
+                if dfa_nodes[index].d == group[i]:
+                    dfa_nodes[index].d = dfa_nodes[main_index].number
+    delete_i.sort(reverse=True)
+    for i in range(len(delete_i)):
+        del dfa_nodes[delete_i[i]]
+    test_node(dfa_nodes)
+    # dfa_nodes = minidfa(dfa_nodes)
+    return dfa_nodes
 
 
 def main():
     global token
     global status_index
     # input_string = input('>>')
-    input_string = 'b(a|b)*a'
+    # input_string = 'b(a|b)*a'
     # input_string = 'b*a(a|b)*'
-    # input_string = '(ab)*(a*|b*)(ba)*'
+    input_string = '(ab)*(a*|b*)(ba)*'
     # input_string = 'a(a|b)cd'
 
     modify_string = "".join(modify_regex(input_string))
@@ -395,7 +443,7 @@ def main():
     suffix_string = suffixexp(modify_string)
     # print(suffix_string)
     fragments, nfa_nodes = to_nfa(suffix_string)
-    nfa_show(fragments, nfa_nodes)  # test 1
+    # nfa_show(fragments, nfa_nodes)  # test 1
 
     start_id = fragments[-1].start.id
     end_id = fragments[-1].end.id
@@ -404,6 +452,7 @@ def main():
     dfa_show(dfa_nodes)
 
     dfa_nodes = minidfa(dfa_nodes)
+    mini_dfa_show(dfa_nodes)
 
 if __name__ == '__main__':
     main()
