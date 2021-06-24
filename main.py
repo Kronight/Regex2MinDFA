@@ -230,9 +230,9 @@ def closure(nfa_nodes, index, alpha, closure_list):
         return
     else:
         for _id in nfa_nodes[index].toid:
-            closure(nfa_nodes, _id, chr(949), closure_list)
             if _id not in closure_list:
                 closure_list.append(_id)
+                closure(nfa_nodes, _id, chr(949), closure_list)
     closure_list.sort()
 
 
@@ -245,13 +245,9 @@ def nfa2dfa(nfa_nodes, start_id, end_id):
         a_list, b_list, c_list, d_list = [], [], [], []
         for id_ in id_list:
             closure(nfa_nodes, id_, 'a', a_list)
-            # a_list = delete_same(id_list, a_list)
             closure(nfa_nodes, id_, 'b', b_list)
-            # b_list = delete_same(id_list, b_list)
             closure(nfa_nodes, id_, 'c', c_list)
-            # c_list = delete_same(id_list, c_list)
             closure(nfa_nodes, id_, 'd', d_list)
-            # d_list = delete_same(id_list, d_list)
         dfa_nodes.append(DfaNode(index, id_list, a_list, b_list, c_list, d_list, is_end(end_id, id_list)))
         index += 1
         list_in(a_list, id_lists)
@@ -276,13 +272,7 @@ def test_node(dfa_nodes):
     print("\nNo  a  b  c  d end")
     for index in range(len(dfa_nodes)):
         print(str(dfa_nodes[index].number) + " " + str(dfa_nodes[index].a) + " " + str(dfa_nodes[index].b) + " " + str(
-            dfa_nodes[index].c) + " " + str(dfa_nodes[index].d) + " " +str(dfa_nodes[index].end_status))
-
-
-def delete_same(_list, to_list):
-    if _list == to_list:
-        to_list = []
-    return to_list
+            dfa_nodes[index].c) + " " + str(dfa_nodes[index].d) + " " + str(dfa_nodes[index].end_status))
 
 
 def is_end(id_, list_):
@@ -333,7 +323,7 @@ def dfa_show(dfa_nodes):
             f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].c)), label="c")
         if isinstance(dfa_nodes[index].d, int):
             f.edge("{}".format(str(dfa_nodes[index].number)), "{}".format(str(dfa_nodes[index].d)), label="d")
-    # f.view()
+    f.view()
 
 
 def nfa_show(fragments, status):
@@ -388,8 +378,6 @@ def regroup(groups, dfa_nodes, end_index):
             groups.append(new_group)
         groups.remove(group)
     _len2 = len(groups)
-    # if _len1 != _len2:
-    #     groups = regroup(groups, dfa_nodes, end_index)
     return groups
 
 
@@ -418,7 +406,6 @@ def minidfa(dfa_nodes):
                 scores[jndex] = 0
         groups.append(group)
     groups = regroup(groups, dfa_nodes, end_index)
-    print(groups)
     delete_i = []
     for group in groups:
         main_index = group[0]
@@ -453,18 +440,19 @@ def main():
     global token
     global status_index
     # input_string = input('>>')
-    # input_string = 'b(a|b)*a'
-    # input_string = 'b*a(a|b)*'
-    # input_string = '(ab)*(a*|b*)(ba)*'
-    input_string = 'a(a|b)cd'
+    # input_string = "(a*|b*)b(ba)*"
+    # input_string = "a(a|c)b|b(ab|bc)(ba|c)"
+    input_string = "((a*)*|(b|a)*)cd*"
+    # input_string = '(a*|b*)*a*b*'
 
     modify_string = "".join(modify_regex(input_string))
     # print(modify_string)
 
     suffix_string = suffixexp(modify_string)
     # print(suffix_string)
+
     fragments, nfa_nodes = to_nfa(suffix_string)
-    # nfa_show(fragments, nfa_nodes)  # test 1
+    nfa_show(fragments, nfa_nodes)
 
     start_id = fragments[-1].start.id
     end_id = fragments[-1].end.id
